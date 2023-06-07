@@ -252,3 +252,5 @@ function TrackballRotator(canvas, callback, viewDistance, viewpointDirection, vi
         c[2] = z;
     }
 }
+
+

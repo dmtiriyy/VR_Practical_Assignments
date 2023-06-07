@@ -1,0 +1,100 @@
+
+
+// Vertex shader
+const vertexShaderSource = `
+attribute vec3 vertex;
+attribute vec2 texture;
+uniform mat4 ModelViewMatrix, ProjectionMatrix;
+
+varying vec2 v_texcoord;
+
+uniform vec3 translatePoint;
+uniform vec2 texturePoint;
+uniform float rotateValue;
+
+//функція для створення матриці переміщення
+mat4 translation(float tx, float ty, float tz) {
+    mat4 dst;
+
+    dst[0][0] = 1.0;
+    dst[0][ 1] = 0.0;
+    dst[0][ 2] = 0.0;
+    dst[0][ 3] = 0.0;
+    dst[1][ 0] = 0.0;
+    dst[1][ 1] = 1.0;
+    dst[1][ 2] = 0.0;
+    dst[1][ 3] = 0.0;
+    dst[2][ 0] = 0.0;
+    dst[2][ 1] = 0.0;
+    dst[2][ 2] = 1.0;
+    dst[2][ 3] = 0.0;
+    dst[3][ 0] = tx;
+    dst[3][ 1] = ty;
+    dst[3][ 2] = tz;
+    dst[3][ 3] = 1.0;
+    return dst;
+}
+//функція для створення матриця обертання
+mat4 rotation(float angleInRadians) {
+    mat4 dst;
+    float c = cos(angleInRadians);
+    float s = sin(angleInRadians);
+
+    dst[0][0] = c;
+    dst[0][ 1] = s;
+    dst[0][ 2] = 0.0;
+    dst[0][ 3] = 0.0;
+    dst[1][ 0] = -s;
+    dst[1][ 1] = c;
+    dst[1][ 2] = 0.0;
+    dst[1][ 3] = 0.0;
+    dst[2][ 0] = 0.0;
+    dst[2][ 1] = 0.0;
+    dst[2][ 2] = 1.0;
+    dst[2][ 3] = 0.0;
+    dst[3][ 0] = 0.0;
+    dst[3][ 1] = 0.0;
+    dst[3][ 2] = 0.0;
+    dst[3][ 3] = 1.0;
+
+    return dst;
+}
+
+void main() {
+    mat4 rMatrix = rotation(rotateValue);
+    mat4 t1Matrix = translation(texturePoint.x,texturePoint.y,0.0);
+    mat4 t2Matrix = translation(-texturePoint.x,-texturePoint.y,0.0);
+    vec4 texture1 = vec4(texture,0.0,0.0)*t1Matrix;
+    vec4 textureRotated = texture1*rMatrix;
+    vec4 texture2 = textureRotated*t2Matrix;
+    v_texcoord = vec2(texture2.x,texture2.y);
+    vec4 vertPos4 = ModelViewMatrix * vec4(vertex, 1.0);
+    gl_Position = ProjectionMatrix* vertPos4;
+    //if(rotateValue>1000.0){
+    //    vec4 tPoint = translation(translatePoint.x,translatePoint.y,translatePoint.z)*vec4(vertex,1.0);
+    //    gl_Position = ModelViewProjectionMatrix*tPoint;
+    //}
+}`;
+
+
+// Fragment shader
+const fragmentShaderSource = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+   precision highp float;
+#else
+   precision mediump float;
+#endif
+
+varying vec2 v_texcoord;
+uniform sampler2D tmu;
+uniform float rotateValue;
+
+void main() {
+    //накладаємо  текстуру
+    vec4 texColor = texture2D(tmu, v_texcoord);
+    gl_FragColor = texColor;
+    //якщо це точка на  поверхні текстуру не накладаємо
+    if(rotateValue>1000.0){
+        gl_FragColor = vec4(0.,0.,0.,0.);
+    }
+}`;
