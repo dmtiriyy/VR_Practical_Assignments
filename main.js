@@ -265,7 +265,8 @@ function draw() {
 
   gl.uniform1i(shProgram.iTMU, 0);
   gl.enable(gl.TEXTURE_2D);
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, m4.multiply(matAccum1, rotationMat));
+  // gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, m4.multiply(matAccum1, rotationMat));
+  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, matAccum1);
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.uniform2fv(shProgram.iTexturePoint, [texturePoint.x, texturePoint.y]);
   gl.uniform1f(shProgram.iRotateValue, rotateValue);
@@ -282,9 +283,13 @@ function draw() {
   surface.Draw();
   gl.colorMask(true, true, true, true);
   // let tr = Cornucopia(map(texturePoint.x, 0, 1, 0, Math.PI * 2), map(texturePoint.y, 0, 1, 0, Math.PI * 2))
-  // gl.uniform3fv(shProgram.iTranslatePoint, [tr.x, tr.y, tr.z]);
-  // gl.uniform1f(shProgram.iRotateValue, 1100);
-  // point.DisplayPoint();
+  let tr = rotateVector();
+  gl.uniform3fv(shProgram.iTranslatePoint, [tr[0], tr[1], tr[2]]);
+  gl.uniform1f(shProgram.iRotateValue, 1100);
+  if (panner) {
+    panner.setPosition(tr[0], tr[1], tr[2])
+  }
+  point.DisplayPoint();
 
 }
 
@@ -471,7 +476,7 @@ function init() {
   }
 
   spaceball = new TrackballRotator(canvas, draw, 0);
-
+  startAudio()
   drawDraw()
 }
 
@@ -610,3 +615,108 @@ function getRotationMatrix() {
   ];
 
 };
+
+var audio = null;
+var audioContext;
+var source;
+var panner;
+var filter;
+
+function AudioSetup() {
+  audio = document.getElementById('audio');
+
+  audio.addEventListener('play', () => {
+    console.log('play');
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      source = audioContext.createMediaElementSource(audio);
+      panner = audioContext.createPanner();
+      filter = audioContext.createBiquadFilter();
+
+      // Connect audio nodes
+      source.connect(panner);
+      panner.connect(filter);
+      filter.connect(audioContext.destination);
+
+      // highshelf filter parameters
+      filter.type = 'lowpass';
+      filter.Q.value = 1;
+      filter.frequency.value = 1000;
+      filter.gain.value = 15;
+      audioContext.resume();
+    }
+  })
+
+
+  audio.addEventListener('pause', () => {
+    console.log('pause');
+    audioContext.resume();
+  })
+}
+
+function startAudio() {
+  AudioSetup();
+
+  let filterCheckbox = document.getElementById('filterCheckbox');
+  filterCheckbox.addEventListener('change', function() {
+    if (filterCheckbox.checked) {
+      // Connect filter when checkbox is checked
+      panner.disconnect();
+      panner.connect(filter);
+      filter.connect(audioContext.destination);
+    } else {
+      // Disconnect filter when checkbox is unchecked
+      panner.disconnect();
+      panner.connect(audioContext.destination);
+    }
+  });
+
+  audio.play();
+}
+
+function rotateVector() {
+  const alphaRad = beta;
+  const betaRad = gamma;
+  const gammaRad = alpha;
+
+  // Define the initial vector along the x-axis
+  let vector = [0, 0, 1];
+
+  // Rotation around the z-axis (gamma)
+  const rotZ = [
+    [Math.cos(gammaRad), -Math.sin(gammaRad), 0],
+    [Math.sin(gammaRad), Math.cos(gammaRad), 0],
+    [0, 0, 1]
+  ];
+  vector = multiplyMatrixVector(rotZ, vector);
+
+  // Rotation around the y-axis (beta)
+  const rotY = [
+    [Math.cos(betaRad), 0, Math.sin(betaRad)],
+    [0, 1, 0],
+    [-Math.sin(betaRad), 0, Math.cos(betaRad)]
+  ];
+  vector = multiplyMatrixVector(rotY, vector);
+
+  // Rotation around the x-axis (alpha)
+  const rotX = [
+    [1, 0, 0],
+    [0, Math.cos(alphaRad), -Math.sin(alphaRad)],
+    [0, Math.sin(alphaRad), Math.cos(alphaRad)]
+  ];
+  vector = multiplyMatrixVector(rotX, vector);
+
+  return vector;
+}
+
+function multiplyMatrixVector(matrix, vector) {
+  const result = [];
+  for (let i = 0; i < matrix.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < vector.length; j++) {
+      sum += matrix[i][j] * vector[j];
+    }
+    result.push(sum);
+  }
+  return result;
+}
